@@ -1,7 +1,7 @@
 const { generators } = require('openid-client');
 const { createResponse } = require('@vercel/node');
 
-module.exports = async (req, res) => {
+export default async function handler(req, res)  {
   const { query } = req;
   const { code, state } = query;
 

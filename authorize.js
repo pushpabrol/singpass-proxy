@@ -4,7 +4,7 @@ const { JWK } = pkg;
 const {Issuer, generators } = require('openid-client');
 const { createResponse } = require('@vercel/node');
 
-module.exports = async (req, res) => {
+export default async function handler(req, res)  {
   // Generate code_verifier and code_challenge
   const code_verifier = generators.codeVerifier();
   const code_challenge = generators.codeChallenge(code_verifier);

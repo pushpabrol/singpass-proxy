@@ -1,4 +1,4 @@
-module.exports = (req, res) => {
+export default async function handler(req, res)  {
     // Create and return a JSON Web Key Set (JWKS)
     // const jwks = {
     //   keys: [{ kty: 'RSA', use: 'sig' }],
