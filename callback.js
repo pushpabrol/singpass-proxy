@@ -41,18 +41,15 @@ const auth0Issuer = await Issuer.discover(`https://${process.env.DOMAIN}`);
 
 
 const client = new auth0Issuer.Client({
-    client_id: process.env.PKJWT_CLIENT_ID,
+    client_id: process.env.SINGPASS_CLIENT_ID,
     token_endpoint_auth_method: 'private_key_jwt',
-    redirect_uris: [process.env.PKJWT_REDIRECT_URI]
+    redirect_uris: [process.env.RP_REDIRECT_URI]
 
 },keystore.toJSON(true));
-
-  // Use code_verifier and code_challenge as needed
-
 
   const tokenSet = await client.callback(process.env.PKJWT_REDIRECT_URI, params, {"nonce" : nonce,"code_verifier": code_verifier });
 
   // For simplicity, respond with a success message
-  const response = createResponse(res);
+  const response = createResponse(tokenSet);
   response.send('Token request successful');
 };
