@@ -1,16 +1,13 @@
 {
   "functions": {
-    "authorize": {
-      "handler": "authorize"
+    "authorize.js": {
+
     },
-    "callback": {
-      "handler": "callback"
+    "callback.js": {
     },
-    "token": {
-        "handler": "token"
+    "token.js": {
       },
-    ".well-known/jwks.json": {
-      "handler": "jwks"
+    "jwks.js": {
     }
   }
 }
