@@ -10,6 +10,8 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "@vercel/kv": "^0.2.2",
+    "@vercel/node": "^3.0.4",
     "axios": "^1.5.0",
     "jsonwebtoken": "^9.0.2",
     "node-jose": "^2.2.0",

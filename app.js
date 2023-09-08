@@ -1,10 +1,78 @@
+const express = require('express');
+const { JWK, SignJWT, parseJwk } = require('node-jose');
+const {Issuer, generators } = require('openid-client');
 const axios = require('axios');
 const jwt = require('jsonwebtoken');
-const { SignJWT, parseJwk } = require('node-jose');
 const uuid = require('uuid');
+const dotenv  = require('dotenv');
+dotenv.config()
+
+const app = express();
+const port = 3000;
+
+// Middleware to parse JSON request bodies
+app.use(express.json());
 
 
-export default async function handler(req, res)  {
+// Create a route for the /authorize endpoint
+app.get('/authorize', async (req, res) => {
+  // Generate code_verifier and code_challenge
+  const code_verifier = generators.codeVerifier();
+  const code_challenge = generators.codeChallenge(code_verifier);
+
+  // Store code_verifier in Vercel KV store
+  const { kv } = require("@vercel/kv");
+  const nonce = generators.nonce();
+  const state = generators.state();
+  await kv.set(`${state}:code_verifier`, code_verifier);
+  await kv.set(`${state}:nonce`, nonce);
+
+    var keyJSON = {
+        "kty": "EC",
+        "use": "sig",
+        "crv": "P-256",
+        "kid": "sig-2021-08-30T04:38:19Z",
+        "x": "pQ6PL6JX14NpKka8j261yHMYsCQ6t3YMlDLpwIIxYcI",
+        "y": "NHYjUfuLspMW_-5PaulnvkRd34vYeVogpl-WFv8tRkc",
+        "alg": "ES256",
+        "d" : "2FwqOVMxvumPcB4-wI0ZkTHnUYQcoj4TGwf3Ulq7E6s"
+    };
+    
+    
+    var key = await JWK.asKey(keyJSON)
+    var keystore = JWK.createKeyStore();
+    await keystore.add(key);
+
+    const auth0Issuer = await Issuer.discover(`https://${process.env.DOMAIN}`);
+
+    //console.log('Discovered issuer %s %O', auth0Issuer.issuer, auth0Issuer.metadata);
+
+    const client = new auth0Issuer.Client({
+        client_id: process.env.SINGPASS_CLIENT_ID,
+        token_endpoint_auth_method: 'private_key_jwt',
+        redirect_uris: [process.env.RP_REDIRECT_URI]
+
+    },keystore.toJSON(true));
+
+    const url = client.authorizationUrl({
+        scope: `openid`,
+        nonce: nonce,
+        state:state,
+        response_type: "code",  
+        code_challenge,
+        code_challenge_method: 'S256',
+
+    });
+
+    console.log(url);
+
+  res.redirect(url);
+
+});
+
+// Create a route for the /token endpoint
+app.post('/token', async (req, res) => {
+  // Retrieve sessionId from the query parameters
   const { client_id, client_secret, code, code_verifier, redirect_uri } = req.body;
 
   if (!client_id || !client_secret) {
@@ -60,7 +128,36 @@ export default async function handler(req, res)  {
   } else {
     return res.status(401).send('Invalid request');
   }
-};
+
+});
+
+// Create a route for /.well-known/jwks.json
+app.get('/.well-known/jwks.json', (req, res) => {
+  // Create and return a JSON Web Key Set (JWKS)
+  const jwks = {
+    keys: [JWK.asKey({ kty: 'RSA', use: 'sig' })],
+  };
+
+  //res.json(jwks);
+  res.json({
+    "keys": [
+    {
+    "kty": "EC",
+    "use": "sig",
+    "crv": "P-256",
+    "kid": "sig-2021-08-30T04:38:19Z",
+    "x": "pQ6PL6JX14NpKka8j261yHMYsCQ6t3YMlDLpwIIxYcI",
+    "y": "NHYjUfuLspMW_-5PaulnvkRd34vYeVogpl-WFv8tRkc",
+    "alg": "ES256"
+    }
+    ]
+    });
+});
+
+// Start the Express server
+app.listen(port, () => {
+  console.log(`Server is listening at http://localhost:${port}`);
+});
 
 
 async function loadPrivateKey() {
