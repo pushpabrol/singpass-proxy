@@ -1,13 +1,16 @@
 {
   "functions": {
     "authorize.js": {
-
+        "maxDuration": 60
     },
     "callback.js": {
+        "maxDuration": 60
     },
     "token.js": {
+        "maxDuration": 60
       },
     "jwks.js": {
+        "maxDuration": 60
     }
   }
 }
