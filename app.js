@@ -66,6 +66,7 @@ app.post('/token', async (req, res) => {
   // Retrieve sessionId from the query parameters
   const { client_id, code, code_verifier, redirect_uri } = req.body;
   const auth0Issuer = await Issuer.discover(`https://${process.env.IDP_DOMAIN}`);
+  const { kv } = require("@vercel/kv");
   const nonce = await kv.get(`${code_verifier}:nonce`);
   //const nonce = "12345";
 
