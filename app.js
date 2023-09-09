@@ -55,7 +55,6 @@ app.get('/authorize', async (req, res) => {
     const url = client.authorizationUrl({
         scope: `openid`,
         nonce: nonce,
-        state:state,
         response_type: "code",  
         code_challenge,
         code_challenge_method: 'S256',
