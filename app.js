@@ -23,9 +23,7 @@ app.get('/authorize', async (req, res) => {
   // Store code_verifier in Vercel KV store
   const { kv } = require("@vercel/kv");
   const nonce = generators.nonce();
-  const state = generators.state();
-  await kv.set(`${state}:code_verifier`, code_verifier);
-  await kv.set(`${state}:nonce`, nonce);
+  await kv.set(`${code_verifier}:nonce`, nonce);
 
     var keyJSON = {
         "kty": "EC",
@@ -73,13 +71,16 @@ app.get('/authorize', async (req, res) => {
 // Create a route for the /token endpoint
 app.post('/token', async (req, res) => {
   // Retrieve sessionId from the query parameters
-  const { client_id, client_secret, code, code_verifier, redirect_uri } = req.body;
+  const { client_id, code, code_verifier, redirect_uri } = req.body;
 
-  if (!client_id || !client_secret) {
+
+  const nonce = await kv.get(`${code_verifier}:nonce`);
+
+  if (!client_id) {
     return res.status(400).send('Missing client_id / client_secret');
   }
 
-  if (process.env.AUTH0_CLIENT_ID === client_id && process.env.AUTH0_CLIENT_SECRET === client_secret) {
+  if (process.env.SINGPASS_CLIENT_ID === client_id) {
     try {
       const client_assertion = await generatePrivateKeyJWT(process.env);
 
@@ -93,30 +94,30 @@ app.post('/token', async (req, res) => {
           client_assertion_type: 'urn:ietf:params:oauth:client-assertion-type:jwt-bearer',
           client_assertion,
           code,
+          code_verifier,
           redirect_uri,
         }),
       };
 
       const response = await axios.request(options);
-      const { id_token } = response.data;
+      //return res.status(200).send(response.data);
+       const { id_token } = response.data;
       const publicKey = await loadPublicKey(process.env);
 
-      const code_v = new TextEncoder().encode(code_verifier);
-      const code_v_s256 = crypto.createHash('sha256').update(code_v).digest('base64').replace(/\//g, '_').replace(/\+/g, '-').replace(/=/g, '');
+    
+       console.log(`nonce expected: ${nonce}`);
 
-      console.log(`nonce expected: ${code_v_s256}`);
+       const { payload, protectedHeader } = await jwt.verify(id_token, publicKey, {
+         issuer: `https://${process.env.DOMAIN}/`,
+         audience: process.env.SINGPASS_CLIENT_ID,
+       });
 
-      const { payload, protectedHeader } = await jwt.verify(id_token, publicKey, {
-        issuer: process.env.ISSUER,
-        audience: process.env.CLIENT_ID,
-      });
-
-      if (payload.nonce !== code_v_s256) {
-        return res.status(400).send('Nonce mismatch');
-      } else {
-        response.data.payload = payload;
-        return res.status(200).send(response.data);
-      }
+       if (payload.nonce !== nonce) {
+         return res.status(400).send('Nonce mismatch');
+       } else {
+         response.data.payload = payload;
+         return res.status(200).send(response.data);
+       }
     } catch (error) {
       if (error.response) {
         return res.status(error.response.status).send(error.response.data);
@@ -200,7 +201,7 @@ async function loadPrivateKey() {
         .setIssuedAt()
         .setIssuer(process.env.SINGPASS_CLIENT_ID)
         .setSubject(process.env.SINGPASS_CLIENT_ID)
-        .setAudience(process.env.SINGPASS_ENVIRONMENT)
+        .setAudience(`https://${process.env.DOMAIN}/`)
         .setExpirationTime('2m') // Expiration time
         .setJti(uuid.v4())
         .sign(key);
