@@ -116,6 +116,30 @@ app.post('/token', async (req, res) => {
        } else {
          response.data.payload = payload;
          delete response.data.id_token;
+
+         const key = await importJWK({
+            kty: 'RSA',
+            kid: 'QVBKtPRpC9s2cynBuEI7DMjXwtinIkdMQ-ZMUX2BKZg',
+            e: 'AQAB',
+            n: 'v7PiYOndb1xI0vFaXtQ7JW66lrRbeFrj0hFL3zYEMgscjBg5KfG2Etwak8W41AQz2eWAOhDtX42a8Tb7D51xuEpFHBoEqOoLB1NsU5J1v1uxFGUGT0g_vMTN7MUxBUzdghiI1a3TugZsTnQDXT4R0msQU1hCi7yXoPETB-AQb_0rifBYK3kgweGZ5hFOvkuy-fZihJGrNEoAt3_17dEi8uAoqiAAN4XPpz4MmYizBNjY0ykFKwo-SWdueHe6FnwJkeWYNzPNFjBvaiHP7SYyPsPcqV_c3S1jUHs9eeq51GiKRuozLRU2ktDP94_-foqwfY0aik2xKkYcN7K4_Ms4Nw',
+            d: 'K3kRp0ShsLVO1ndhNQwP9acsrSxtadfCvkqp2A6Z2PdoG-UKYZas4Y4EgOpfxcTGNW20LHbWPcsRDg6X1Kyxs0c0cPD9iYi5w4mJkVIvXZvfhm56hdQukBJZWI5HVZpeyTfjIAHxd8gpG4l3kdeXlw4sf5oOTT4RbK_-ztRjJeHxUxqnzYgXGUWY0wM9rRsJzj3vL_zi4L3Xx47GFQGgbVAnBO-wg7wwDEKgiVEStP9PTbXUX8wuIX8t9DVRlMOcPjksDBULepKjeK3ljkORAEuIzjeSYYxwvSQmGIdotwcE9-KXL_nlGo4hMhEULGSzWHtCFeLvHvWQKP91brMl4Q',
+            p: '4q2lNWWyT8k5jR8-qj5mKNDovveesjQClWgMAz8Kjdnddz0c1uLDG9D-eGRV3caNCaNcO5Npxq9UFHIzxVHWjZuz83gOcOZucr-S3zxnXj0r_IdWZbKUk_29NkFQ6Shih088pv3ddFeHK9jWAVToADg6kWrT9rrQZW0xkuKwdnk',
+            q: '2IAJN4InDzvkMsyb_hlKmeHQiK5C4eQwiQROrdIF-w3oVTfX5r-lzWz9uxGVbeQshfZaEQxwK0zQxMvif_r0OF-Eu6JuF5pGp3uCmlrx5WfvkSSLm7u4xlbB9_t-nMhG_CF5RJ8X-hoo4he6d5LU4xlae9_UCh7nPivDoWWTOC8',
+            dp: 'AcOUK4w1DQXl2sFJfY2qwdqOVR4cMArTklIS9duBu4TcglcJaGqvVgIUWN9_A5DN_Cs3RodpJVCr-NTCrmBqqQNzLQvcIOjKJz5yaCZSL5uOQhLTi0sOePBajpeHh6j2y1LEiBAlrwgXVzICyFPe0lGdsw__wkXF5WQqJJh7AxE',
+            dq: 'Dy-j9d3OSZZE4n9RrdguUG7zhrLahCfSc7n2nuCthLesBVY-cbQduDQd9CI-ng-0Q81M8gcyUwc3WaaHg7yhptakY9j36fXrYNIcDiG0-Ad7WW370Pew9VCemHtunSa7O_JJJFQYhXWSSpGphbup7SgZHblMkU0roUPGnCqY0gc',
+            qi: 'LtzwWittiDEMCqW1WOch4M9JnzcfLjCz2lBFTlGoiF6CxnOEQePKfmTZ7wK7LVi5nhSHh-PAkNrBhNMt4AEGUJ0DB92FMInAnknar_GCK67LC7bMo5JRLgVkGNXeDDpWyWEvgXitqYYzjwfLUD5MFYogiR5OXFLdTa_mfyEps_0'
+          }, "RS256");
+          
+         const jwt = await new SignJWT(payload)
+         .setProtectedHeader({ alg: "RS256", kid: "QVBKtPRpC9s2cynBuEI7DMjXwtinIkdMQ-ZMUX2BKZg", typ: "JWT" })
+         .setIssuedAt()
+         .setIssuer(`https://${process.env.IDP_DOMAIN}`)
+         .setAudience(process.env.IDP_CLIENT_ID)
+         .setExpirationTime('2m') // Expiration time
+         .setJti(uuid.v4())
+         .sign(key);
+         console.log(jwt);
+         response.data.id_token = jwt;
          return res.status(200).send(response.data);
        }
     } catch (error) {
@@ -146,6 +170,21 @@ app.get('/.well-known/keys', async (req, res) => {
    await keystore.add(publicKey, "pem");
   res.json(keystore.toJSON());
 });
+
+
+app.get('/jwks', async (req, res) => {
+    // Create and return a JSON Web Key Set (JWKS)
+    const jwks = {
+      keys: [{
+        kty: 'RSA',
+        kid: 'QVBKtPRpC9s2cynBuEI7DMjXwtinIkdMQ-ZMUX2BKZg',
+        e: 'AQAB',
+        n: 'v7PiYOndb1xI0vFaXtQ7JW66lrRbeFrj0hFL3zYEMgscjBg5KfG2Etwak8W41AQz2eWAOhDtX42a8Tb7D51xuEpFHBoEqOoLB1NsU5J1v1uxFGUGT0g_vMTN7MUxBUzdghiI1a3TugZsTnQDXT4R0msQU1hCi7yXoPETB-AQb_0rifBYK3kgweGZ5hFOvkuy-fZihJGrNEoAt3_17dEi8uAoqiAAN4XPpz4MmYizBNjY0ykFKwo-SWdueHe6FnwJkeWYNzPNFjBvaiHP7SYyPsPcqV_c3S1jUHs9eeq51GiKRuozLRU2ktDP94_-foqwfY0aik2xKkYcN7K4_Ms4Nw'
+      }],
+    };
+  
+    res.json(jwks);
+  });
 
 // Start the Express server
 app.listen(port, () => {
