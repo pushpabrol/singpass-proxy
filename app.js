@@ -158,7 +158,7 @@ app.listen(port, () => {
 });
 
 
-async function loadPrivateKey() {
+async function loadPrivateKeyForClientAssertion() {
     try {
         var publicKey =  process.env.RELYING_PARTY_PUBLIC_KEY.replace(/\n/g,"\r\n");
         const key = await JWK.asKey(publicKey,"pem");
@@ -202,7 +202,7 @@ async function loadPrivateKey() {
   
   async function generatePrivateKeyJWTForClientAssertion() {
     try {
-      const key = await loadPrivateKey();
+      const key = await loadPrivateKeyForClientAssertion();
       console.log(key);
       const jwt = await new SignJWT({})
         .setProtectedHeader({ alg: process.env.IDP_SIGNING_ALG, kid: process.env.RELYING_PARTY_KID, typ: "JWT" })
