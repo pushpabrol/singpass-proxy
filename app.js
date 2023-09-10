@@ -72,7 +72,7 @@ app.post('/token', async (req, res) => {
 
   if (process.env.IDP_CLIENT_ID === client_id) {
     try {
-      const client_assertion = await generatePrivateKeyJWT(process.env);
+      const client_assertion = await generatePrivateKeyJWTForClientAssertion(process.env);
       console.log(client_assertion);
       const options = {
         method: 'POST',
@@ -125,7 +125,7 @@ app.post('/token', async (req, res) => {
       }
     }
   } else {
-    return res.status(401).send('Invalid request');
+    return res.status(401).send('Invalid request, client_d is incorrect!');
   }
 
 });
@@ -164,7 +164,7 @@ async function loadPrivateKey() {
         const key = await JWK.asKey(publicKey,"pem");
         var jsonData = key.toJSON();
         jsonData.d = process.env.RELYING_PARTY_PRIVATE_KEY;
-        return await importJWK(jsonData, process.env.IDP_CLIENT_ASSERTION_SIGNING_ALG);
+        return await importJWK(jsonData, process.env.RELYING_PARTY_CLIENT_ASSERTION_SIGNING_ALG);
     } catch (e) {
       return e;
     }
@@ -173,7 +173,7 @@ async function loadPrivateKey() {
   async function loadRS256PrivateKey() {
     try {
         var privateKey =  process.env.INTERMEDIARY_PRIVATE_KEY.replace(/\n/g,"\r\n");
-        console.log(privateKey);
+        //console.log(privateKey);
         var key = await importPKCS8(privateKey,process.env.INTERMEDIARY_SIGNING_ALG);
         return key;
     } catch (e) {
@@ -200,7 +200,7 @@ async function loadPrivateKey() {
     }
   }
   
-  async function generatePrivateKeyJWT() {
+  async function generatePrivateKeyJWTForClientAssertion() {
     try {
       const key = await loadPrivateKey();
       console.log(key);
