@@ -183,7 +183,7 @@ async function loadPrivateKey() {
         requestHeaders: {}, // Optional
         timeout: 30000 // Defaults to 30s
         });
-        const kid = 'MFZeG102dQiqbANoaMlW_Jmf7fOZmtRsHt77JFhTpF0';
+        const kid = process.env.IDP_SIGNING_KEY_KID;
         const key = await client.getSigningKey(kid);
         console.log(key);
         const signingKey = key.publicKey || key.rsaPublicKey;
