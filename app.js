@@ -114,6 +114,7 @@ app.post('/token', async (req, res) => {
        if (payload.nonce !== nonce) {
          return res.status(400).send('Nonce mismatch');
        } else {
+         delete payload.nonce;
          response.data.payload = payload;
          delete response.data.id_token;
 
