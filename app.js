@@ -117,30 +117,9 @@ app.post('/token', async (req, res) => {
          delete payload.nonce;
          response.data.payload = payload;
          delete response.data.id_token;
-
-         const key = await importJWK({
-            kty: 'RSA',
-            kid: 'QVBKtPRpC9s2cynBuEI7DMjXwtinIkdMQ-ZMUX2BKZg',
-            e: 'AQAB',
-            n: 'v7PiYOndb1xI0vFaXtQ7JW66lrRbeFrj0hFL3zYEMgscjBg5KfG2Etwak8W41AQz2eWAOhDtX42a8Tb7D51xuEpFHBoEqOoLB1NsU5J1v1uxFGUGT0g_vMTN7MUxBUzdghiI1a3TugZsTnQDXT4R0msQU1hCi7yXoPETB-AQb_0rifBYK3kgweGZ5hFOvkuy-fZihJGrNEoAt3_17dEi8uAoqiAAN4XPpz4MmYizBNjY0ykFKwo-SWdueHe6FnwJkeWYNzPNFjBvaiHP7SYyPsPcqV_c3S1jUHs9eeq51GiKRuozLRU2ktDP94_-foqwfY0aik2xKkYcN7K4_Ms4Nw',
-            d: 'K3kRp0ShsLVO1ndhNQwP9acsrSxtadfCvkqp2A6Z2PdoG-UKYZas4Y4EgOpfxcTGNW20LHbWPcsRDg6X1Kyxs0c0cPD9iYi5w4mJkVIvXZvfhm56hdQukBJZWI5HVZpeyTfjIAHxd8gpG4l3kdeXlw4sf5oOTT4RbK_-ztRjJeHxUxqnzYgXGUWY0wM9rRsJzj3vL_zi4L3Xx47GFQGgbVAnBO-wg7wwDEKgiVEStP9PTbXUX8wuIX8t9DVRlMOcPjksDBULepKjeK3ljkORAEuIzjeSYYxwvSQmGIdotwcE9-KXL_nlGo4hMhEULGSzWHtCFeLvHvWQKP91brMl4Q',
-            p: '4q2lNWWyT8k5jR8-qj5mKNDovveesjQClWgMAz8Kjdnddz0c1uLDG9D-eGRV3caNCaNcO5Npxq9UFHIzxVHWjZuz83gOcOZucr-S3zxnXj0r_IdWZbKUk_29NkFQ6Shih088pv3ddFeHK9jWAVToADg6kWrT9rrQZW0xkuKwdnk',
-            q: '2IAJN4InDzvkMsyb_hlKmeHQiK5C4eQwiQROrdIF-w3oVTfX5r-lzWz9uxGVbeQshfZaEQxwK0zQxMvif_r0OF-Eu6JuF5pGp3uCmlrx5WfvkSSLm7u4xlbB9_t-nMhG_CF5RJ8X-hoo4he6d5LU4xlae9_UCh7nPivDoWWTOC8',
-            dp: 'AcOUK4w1DQXl2sFJfY2qwdqOVR4cMArTklIS9duBu4TcglcJaGqvVgIUWN9_A5DN_Cs3RodpJVCr-NTCrmBqqQNzLQvcIOjKJz5yaCZSL5uOQhLTi0sOePBajpeHh6j2y1LEiBAlrwgXVzICyFPe0lGdsw__wkXF5WQqJJh7AxE',
-            dq: 'Dy-j9d3OSZZE4n9RrdguUG7zhrLahCfSc7n2nuCthLesBVY-cbQduDQd9CI-ng-0Q81M8gcyUwc3WaaHg7yhptakY9j36fXrYNIcDiG0-Ad7WW370Pew9VCemHtunSa7O_JJJFQYhXWSSpGphbup7SgZHblMkU0roUPGnCqY0gc',
-            qi: 'LtzwWittiDEMCqW1WOch4M9JnzcfLjCz2lBFTlGoiF6CxnOEQePKfmTZ7wK7LVi5nhSHh-PAkNrBhNMt4AEGUJ0DB92FMInAnknar_GCK67LC7bMo5JRLgVkGNXeDDpWyWEvgXitqYYzjwfLUD5MFYogiR5OXFLdTa_mfyEps_0'
-          }, "RS256");
-          
-         const jwt = await new SignJWT(payload)
-         .setProtectedHeader({ alg: "RS256", kid: "QVBKtPRpC9s2cynBuEI7DMjXwtinIkdMQ-ZMUX2BKZg", typ: "JWT" })
-         .setIssuedAt()
-         .setIssuer(`https://${process.env.IDP_DOMAIN}`)
-         .setAudience(process.env.IDP_CLIENT_ID)
-         .setExpirationTime('2m') // Expiration time
-         .setJti(uuid.v4())
-         .sign(key);
-         console.log(jwt);
-         response.data.id_token = jwt;
+        //genreate R2256 token from payload for auth0
+        const jwt = await generateRS256Token(payload);
+        response.data.id_token = jwt;
          return res.status(200).send(response.data);
        }
     } catch (error) {
@@ -158,13 +137,10 @@ app.post('/token', async (req, res) => {
 
 });
 
-// Create a route for /.well-known/jwks.json
+// Create a route for /.well-known/keys
+// used by the relying part of IDP to provide an ES256 public key for client authentication used by the IDP for verifying client assertion
 app.get('/.well-known/keys', async (req, res) => {
   // Create and return a JSON Web Key Set (JWKS)
-  const jwks = {
-    keys: [JWK.asKey({ kty: 'RSA', use: 'sig' })],
-  };
-
   var publicKey =  process.env.RELYING_PARTY_PUBLIC_KEY.replace(/\n/g,"\r\n");
   var keystore = JWK.createKeyStore();
   //var key2 = await JWK.asKey(privateKey,"pem");     
@@ -172,21 +148,15 @@ app.get('/.well-known/keys', async (req, res) => {
   res.json(keystore.toJSON());
 });
 
-
+// this route returns the RS256 public key - this url becomes the jwks url used by auth0 to verify the RS256 token created
 app.get('/jwks', async (req, res) => {
     // Create and return a JSON Web Key Set (JWKS)
-    const jwks = {
-      keys: [{
-        kty: 'RSA',
-        use: "sig",
-        kid: 'QVBKtPRpC9s2cynBuEI7DMjXwtinIkdMQ-ZMUX2BKZg',
-        "alg": "RS256",
-        e: 'AQAB',
-        n: 'v7PiYOndb1xI0vFaXtQ7JW66lrRbeFrj0hFL3zYEMgscjBg5KfG2Etwak8W41AQz2eWAOhDtX42a8Tb7D51xuEpFHBoEqOoLB1NsU5J1v1uxFGUGT0g_vMTN7MUxBUzdghiI1a3TugZsTnQDXT4R0msQU1hCi7yXoPETB-AQb_0rifBYK3kgweGZ5hFOvkuy-fZihJGrNEoAt3_17dEi8uAoqiAAN4XPpz4MmYizBNjY0ykFKwo-SWdueHe6FnwJkeWYNzPNFjBvaiHP7SYyPsPcqV_c3S1jUHs9eeq51GiKRuozLRU2ktDP94_-foqwfY0aik2xKkYcN7K4_Ms4Nw'
-      }],
-    };
-  
-    res.json(jwks);
+
+    var publicKey =  process.env.INTERMEDIARY_PUBLIC_KEY.replace(/\n/g,"\r\n");
+    var keystore = JWK.createKeyStore();
+    //var key2 = await JWK.asKey(privateKey,"pem");     
+     await keystore.add(publicKey, "pem");
+    res.json(keystore.toJSON());
   });
 
 // Start the Express server
@@ -196,26 +166,22 @@ app.listen(port, () => {
 
 
 async function loadPrivateKey() {
-    const baseUrl = getBaseUrl();
     try {
-        const response = await axios.get(`${baseUrl}/.well-known/keys`);
-        const { keys } = response.data;
-        keys[0].d = process.env.RELYING_PARTY_PRIVATE_KEY;
-        return await importJWK(keys[0], process.env.IDP_SIGNING_ALG);
+        var publicKey =  process.env.RELYING_PARTY_PUBLIC_KEY.replace(/\n/g,"\r\n");
+        const key = await JWK.asKey(publicKey,"pem");
+        var jsonData = key.toJSON();
+        jsonData.d = process.env.RELYING_PARTY_PRIVATE_KEY;
+        return await importJWK(jsonData, process.env.IDP_CLIENT_ASSERTION_SIGNING_ALG);
     } catch (e) {
       return e;
     }
   }
-  
-  async function loadPublicKey() {
 
-    const baseUrl = getBaseUrl();
+  async function loadRS256PrivateKey() {
     try {
-      const response = await axios.get(`${baseUrl}/.well-known/keys`);
-      console.log(response.data);
-      const publicKey = await importJWK(response.data.keys[0], process.env.IDP_SIGNING_ALG);
-      console.log(publicKey);
-      return publicKey;
+        var privateKey =  process.env.INTERMEDIARY_PRIVATE_KEY.replace(/\n/g,"\r\n");
+        var key = await JWK.asKey(privateKey,"pem");
+        return key;
     } catch (e) {
       return e;
     }
@@ -261,10 +227,24 @@ async function loadPrivateKey() {
     }
   }
 
-  const getBaseUrl = () => {
-    if (process.env.NODE_ENV === "development") {
-      return `${process.env.DEV_RP_URL}`
-    }
-    
-    return `${process.env.NEXT_PUBLIC_VERCEL_URL}`;
-  };
+  async function generateRS256Token(payload){
+    if(payload.nonce) delete payload.nonce;
+    try {
+        const key = await loadRS256PrivateKey();
+        console.log(key);
+        const jwt = await new SignJWT(payload)
+          .setProtectedHeader({ alg: process.env.INTERMEDIARY_SIGNING_ALG, kid: process.env.INTERMEDIARY_KEY_KID, typ: "JWT" })
+          .setIssuedAt()
+          .setIssuer(`https://${process.env.IDP_DOMAIN}`)
+          .setAudience(process.env.IDP_CLIENT_ID)
+          .setExpirationTime('2m') // Expiration time
+          .setJti(uuid.v4())
+          .sign(key);
+          console.log(jwt);
+  
+        return jwt;
+      } catch (error) {
+        console.log(error);
+        return error;
+      }
+  }
