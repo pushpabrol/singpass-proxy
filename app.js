@@ -1,6 +1,6 @@
 const express = require('express');
 const { JWK } = require('node-jose');
-const {SignJWT, importJWK } = require('jose');
+const {SignJWT, importJWK, importPKCS8,  } = require('jose');
 const {Issuer, generators } = require('openid-client');
 const axios = require('axios');
 const jwt = require('jsonwebtoken');
@@ -29,12 +29,7 @@ app.get('/authorize', async (req, res) => {
   console.log("code_verifier:", code_verifier);
   var eventual_code_challenge = code_challenge || generators.codeChallenge(code_verifier);
 
-  // Store code_verifier in Vercel KV store
-  const { kv } = require("@vercel/kv");
   const nonce = "12345";
-  //await kv.set(`${code_verifier}:nonce`, nonce);
-  //const nonce="12345";
-
    
     const auth0Issuer = await Issuer.discover(`https://${process.env.IDP_DOMAIN}`);
 
@@ -57,7 +52,7 @@ app.get('/authorize', async (req, res) => {
 
     });
 
-    console.log(url);
+    //console.log(url);
 
   res.redirect(url);
 
@@ -69,8 +64,6 @@ app.post('/token', async (req, res) => {
   // Retrieve sessionId from the query parameters
   const { client_id, code, code_verifier, redirect_uri } = req.body;
   const auth0Issuer = await Issuer.discover(`https://${process.env.IDP_DOMAIN}`);
-  const { kv } = require("@vercel/kv");
-  //const nonce = await kv.get(`${code_verifier}:nonce`);
   const nonce = "12345";
 
   if (!client_id) {
@@ -180,9 +173,10 @@ async function loadPrivateKey() {
   async function loadRS256PrivateKey() {
     try {
         var privateKey =  process.env.INTERMEDIARY_PRIVATE_KEY.replace(/\n/g,"\r\n");
-        var key = await JWK.asKey(privateKey,"pem");
+        var key = await importPKCS8(privateKey,process.env.INTERMEDIARY_SIGNING_ALG);
         return key;
     } catch (e) {
+        console.log(e);
       return e;
     }
   }
@@ -197,7 +191,7 @@ async function loadPrivateKey() {
         });
         const kid = process.env.IDP_SIGNING_KEY_KID;
         const key = await client.getSigningKey(kid);
-        console.log(key);
+        console.log(key.asKey);
         const signingKey = key.publicKey || key.rsaPublicKey;
     return signingKey;
     } catch (e) {
