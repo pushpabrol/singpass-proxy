@@ -115,6 +115,7 @@ app.post('/token', async (req, res) => {
          return res.status(400).send('Nonce mismatch');
        } else {
          response.data.payload = payload;
+         delete response.data.id_token;
          return res.status(200).send(response.data);
        }
     } catch (error) {
