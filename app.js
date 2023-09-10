@@ -173,6 +173,7 @@ async function loadPrivateKey() {
   async function loadRS256PrivateKey() {
     try {
         var privateKey =  process.env.INTERMEDIARY_PRIVATE_KEY.replace(/\n/g,"\r\n");
+        console.log(privateKey);
         var key = await importPKCS8(privateKey,process.env.INTERMEDIARY_SIGNING_ALG);
         return key;
     } catch (e) {
