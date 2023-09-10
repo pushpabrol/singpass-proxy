@@ -22,6 +22,8 @@ app.use(express.urlencoded({ extended: true }));
 
 // Create a route for the /authorize endpoint
 app.get('/authorize', async (req, res) => {
+
+    const { state } = req.query;
   // Generate code_verifier and code_challenge
   const code_verifier = generators.codeVerifier();
   console.log("code_verifier:", code_verifier);
@@ -51,6 +53,7 @@ app.get('/authorize', async (req, res) => {
         response_type: "code",  
         code_challenge,
         code_challenge_method: 'S256',
+        state: state
 
     });
 
