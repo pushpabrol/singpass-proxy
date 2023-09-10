@@ -23,16 +23,16 @@ app.use(express.urlencoded({ extended: true }));
 // Create a route for the /authorize endpoint
 app.get('/authorize', async (req, res) => {
 
-    const { state } = req.query;
+    const { state, code_challenge } = req.query;
   // Generate code_verifier and code_challenge
   const code_verifier = generators.codeVerifier();
   console.log("code_verifier:", code_verifier);
-  const code_challenge = generators.codeChallenge(code_verifier);
+  var eventual_code_challenge = code_challenge || generators.codeChallenge(code_verifier);
 
   // Store code_verifier in Vercel KV store
   const { kv } = require("@vercel/kv");
-  const nonce = generators.nonce();
-  await kv.set(`${code_verifier}:nonce`, nonce);
+  const nonce = "12345";
+  //await kv.set(`${code_verifier}:nonce`, nonce);
   //const nonce="12345";
 
    
@@ -51,7 +51,7 @@ app.get('/authorize', async (req, res) => {
         scope: `openid`,
         nonce: nonce,
         response_type: "code",  
-        code_challenge,
+        code_challenge : eventual_code_challenge,
         code_challenge_method: 'S256',
         state: state
 
@@ -70,8 +70,8 @@ app.post('/token', async (req, res) => {
   const { client_id, code, code_verifier, redirect_uri } = req.body;
   const auth0Issuer = await Issuer.discover(`https://${process.env.IDP_DOMAIN}`);
   const { kv } = require("@vercel/kv");
-  const nonce = await kv.get(`${code_verifier}:nonce`);
-  //const nonce = "12345";
+  //const nonce = await kv.get(`${code_verifier}:nonce`);
+  const nonce = "12345";
 
   if (!client_id) {
     return res.status(400).send('Missing client_id');
