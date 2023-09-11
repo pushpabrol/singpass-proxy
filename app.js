@@ -99,7 +99,7 @@ app.post('/token', async (req, res) => {
       // Extract the id_token from the response
       const { id_token } = response.data;
 
-      const decryted_id_token = decryptJWE(id_token);
+      const decryted_id_token = await decryptJWE(id_token);
 
       // Load the public key of the IDP for verification
       const publicKeyIDP = await loadPublicKeyIDP(process.env);
