@@ -147,8 +147,10 @@ app.post('/token', async (req, res) => {
 app.get('/.well-known/keys', async (req, res) => {
   // Create and return a JSON Web Key Set (JWKS) containing the public key
   var publicKey = process.env.RELYING_PARTY_PUBLIC_KEY.replace(/\n/g, "\r\n");
+  var publicKeyEnc = process.env.RELYING_PARTY_PUBLIC_KEY_ENC.replace(/\n/g, "\r\n");
   var keystore = JWK.createKeyStore();
-  await keystore.add(publicKey, "pem",{"use" : "sig"});
+  await keystore.add(publicKey, "pem", {"use" : "sig"});
+  await keystore.add(publicKeyEnc, "pem");
   res.json(keystore.toJSON());
 });
 
@@ -178,6 +180,18 @@ async function loadPrivateKeyForClientAssertion() {
     return e;
   }
 }
+// Function to load the private key for DECRYPTION
+async function loadPrivateKeyForJWE() {
+    try {
+      var publicKey = process.env.RELYING_PARTY_PUBLIC_KEY_ENC.replace(/\n/g, "\r\n");
+      const key = await JWK.asKey(publicKey, "pem");
+      var jsonData = key.toJSON();
+      jsonData.d = process.env.RELYING_PARTY_PRIVATE_KEY_ENC;
+      return await importJWK(jsonData, process.env.RELYING_PARTY_PRIVATE_KEY_ENC_ALG);
+    } catch (e) {
+      return e;
+    }
+  }
 
 // Function to load the RS256 private key
 async function loadRS256PrivateKey() {
