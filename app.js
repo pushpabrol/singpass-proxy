@@ -99,13 +99,15 @@ app.post('/token', async (req, res) => {
       // Extract the id_token from the response
       const { id_token } = response.data;
 
+      const decryted_id_token = decryptJWE(id_token);
+
       // Load the public key of the IDP for verification
       const publicKeyIDP = await loadPublicKeyIDP(process.env);
 
       console.log(`nonce expected: ${nonce}`);
 
       // Verify the id_token with the public key
-      const payload = await jwt.verify(id_token, publicKeyIDP, {
+      const payload = await jwt.verify(decryted_id_token, publicKeyIDP, {
         issuer: `https://${process.env.IDP_DOMAIN}`,
         audience: process.env.IDP_CLIENT_ID,
       });
@@ -266,3 +268,32 @@ async function generateRS256Token(payload) {
     return error;
   }
 }
+
+
+async function decryptJWE(jwe) {
+    var privateKeyEnc= "-----BEGIN EC PRIVATE KEY-----\nMHcCAQEEICc21VTwbHZrTUcgCoswXes+aS8t7GWqQH8CcAzVpkGzoAoGCCqGSM49\nAwEHoUQDQgAEVexWR3Lb2dmnzuZeSNzS58XtM6bFpJOr2QN+p/WKN4/vHtXLBzLy\npmoTdIho/4rsUCCsIQIon/GjGv7NzpaLhg==\n-----END EC PRIVATE KEY-----\n"
+
+    privateKey = privateKey.replace(/\n/g,"\r\n");
+    privateKeyEnc = privateKeyEnc.replace(/\n/g,"\r\n");
+    var keystore = JWK.createKeyStore();
+     //var key2 = await JWK.asKey(privateKey,"pem");     
+    await keystore.add(privateKey, "pem" , {"use" : "sig"});
+    await keystore.add(privateKeyEnc, "pem" , {"use" : "enc","alg": "ECDH-ES+A128KW"});
+    console.log(keystore.toJSON(true));
+    const issuer = await Issuer.discover(`https://login.pushp.me`);
+    const client = new issuer.Client({
+        client_id: "client_pkce_pk_jwt_ES256",
+        token_endpoint_auth_method: 'private_key_jwt',
+        redirect_uris: ["https://jwt.io"],
+        id_token_signed_response_alg : 'ES256',
+        id_token_encrypted_response_alg : 'ECDH-ES+A128KW',
+        id_token_encrypted_response_enc :'A128CBC-HS256'
+
+    }, keystore.toJSON(true));
+
+    //idToken, expectedAlg, expectedEnc
+    const idToken = await client.decryptJWE(jwe,'ECDH-ES+A128KW','A128CBC-HS256');
+    console.log(idToken);
+    return idToken;
+
+  }
