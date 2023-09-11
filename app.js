@@ -278,7 +278,8 @@ async function decryptJWE(jwe) {
     try {
     var keystore = JWK.createKeyStore();
      //var key2 = await JWK.asKey(privateKey,"pem");     
-     await keystore.add(privateKeyEnc.toJSON(true), "json" , {"use" : "enc","alg": "ECDH-ES+A128KW"}); 
+     //await keystore.add(privateKeyEnc.toJSON(true), "json" , {"use" : "enc","alg": "ECDH-ES+A128KW"}); 
+     await keystore.add(privateKeyEnc);
     //await keystore.add(privateKeyEnc, "pem" , {"use" : "enc","alg": "ECDH-ES+A128KW"});
     console.log(keystore.toJSON(true));
     const issuer = await Issuer.discover(`https://login.pushp.me`);
