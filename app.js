@@ -148,7 +148,7 @@ app.get('/.well-known/keys', async (req, res) => {
   // Create and return a JSON Web Key Set (JWKS) containing the public key
   var publicKey = process.env.RELYING_PARTY_PUBLIC_KEY.replace(/\n/g, "\r\n");
   var keystore = JWK.createKeyStore();
-  await keystore.add(publicKey, "pem");
+  await keystore.add(publicKey, "pem",{"use" : "sig"});
   res.json(keystore.toJSON());
 });
 
