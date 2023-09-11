@@ -23,6 +23,7 @@ app.use(express.urlencoded({ extended: true }));
 
 // Create a route for the /authorize endpoint
 app.get('/authorize', async (req, res) => {
+    const context = req.webtaskContext || process.env;
   // Extract query parameters from the request
   const { state, code_challenge } = req.query;
 
@@ -34,11 +35,11 @@ app.get('/authorize', async (req, res) => {
   const nonce = "12345";
 
   // Discover the OpenID Connect issuer and create a client
-  const auth0Issuer = await Issuer.discover(`https://${process.env.IDP_DOMAIN}`);
+  const auth0Issuer = await Issuer.discover(`https://${context.IDP_DOMAIN}`);
   const client = new auth0Issuer.Client({
-    client_id: process.env.IDP_CLIENT_ID,
+    client_id: context.IDP_CLIENT_ID,
     token_endpoint_auth_method: 'private_key_jwt',
-    redirect_uris: [process.env.RP_REDIRECT_URI]
+    redirect_uris: [context.RP_REDIRECT_URI]
   });
 
   // Generate the authorization URL with required parameters
@@ -57,11 +58,12 @@ app.get('/authorize', async (req, res) => {
 
 // Create a route for the /token endpoint
 app.post('/token', async (req, res) => {
+    const context = req.webtaskContext || process.env;
   console.log(req.body);
 
   // Retrieve parameters from the request body
   const { client_id, code, code_verifier, redirect_uri } = req.body;
-  const auth0Issuer = await Issuer.discover(`https://${process.env.IDP_DOMAIN}`);
+  const auth0Issuer = await Issuer.discover(`https://${context.IDP_DOMAIN}`);
   const nonce = "12345";
 
   // Check if the client_id is missing
@@ -70,10 +72,10 @@ app.post('/token', async (req, res) => {
   }
 
   // Check if the provided client_id matches the expected one
-  if (process.env.IDP_CLIENT_ID === client_id) {
+  if (context.IDP_CLIENT_ID === client_id) {
     try {
       // Generate a client_assertion (JWT) for client authentication
-      const client_assertion = await generatePrivateKeyJWTForClientAssertion(process.env);
+      const client_assertion = await generatePrivateKeyJWTForClientAssertion(context);
       console.log(client_assertion);
 
       // Prepare the request to exchange the authorization code for tokens
@@ -83,7 +85,7 @@ app.post('/token', async (req, res) => {
         headers: { 'content-type': 'application/x-www-form-urlencoded' },
         data: qs.stringify({
           grant_type: 'authorization_code',
-          client_id: process.env.IDP_CLIENT_ID,
+          client_id: context.IDP_CLIENT_ID,
           client_assertion_type: 'urn:ietf:params:oauth:client-assertion-type:jwt-bearer',
           client_assertion,
           code,
@@ -99,17 +101,17 @@ app.post('/token', async (req, res) => {
       // Extract the id_token from the response
       const { id_token } = response.data;
 
-      const decryted_id_token = await decryptJWE(id_token);
+      const decryted_id_token = await decryptJWE(id_token, context);
 
       // Load the public key of the IDP for verification
-      const publicKeyIDP = await loadPublicKeyIDP(process.env);
+      const publicKeyIDP = await loadPublicKeyIDP(context);
 
       console.log(`nonce expected: ${nonce}`);
 
       // Verify the id_token with the public key
       const payload = await jwt.verify(decryted_id_token, publicKeyIDP, {
-        issuer: `https://${process.env.IDP_DOMAIN}`,
-        audience: process.env.IDP_CLIENT_ID,
+        issuer: `https://${context.IDP_DOMAIN}`,
+        audience: context.IDP_CLIENT_ID,
       });
       console.log(payload);
 
@@ -123,7 +125,7 @@ app.post('/token', async (req, res) => {
         delete response.data.id_token;
 
         // Generate an RS256 token from the payload for auth0
-        const jwt = await generateRS256Token(payload);
+        const jwt = await generateRS256Token(payload, context);
         response.data.id_token = jwt;
 
         // Send the response with the updated id_token
@@ -147,19 +149,21 @@ app.post('/token', async (req, res) => {
 // Create a route for /.well-known/keys
 // Used by the relying party of IDP to provide an ES256 public key for client authentication
 app.get('/.well-known/keys', async (req, res) => {
+    const context = req.webtaskContext || process.env;
   // Create and return a JSON Web Key Set (JWKS) containing the public key
-  var publicKey = process.env.RELYING_PARTY_PUBLIC_KEY.replace(/\n/g, "\r\n");
-  var publicKeyEnc = process.env.RELYING_PARTY_PUBLIC_KEY_ENC.replace(/\n/g, "\r\n");
+  var publicKey = context.RELYING_PARTY_PUBLIC_KEY.replace(/\n/g, "\r\n");
+  var publicKeyEnc = context.RELYING_PARTY_PUBLIC_KEY_ENC.replace(/\n/g, "\r\n");
   var keystore = JWK.createKeyStore();
   await keystore.add(publicKey, "pem", {"use" : "sig"});
-  await keystore.add(publicKeyEnc, "pem", {"use" : "enc","alg": "ECDH-ES+A128KW"});
+  await keystore.add(publicKeyEnc, "pem", {"use" : "enc","alg": context.RELYING_PARTY_PRIVATE_KEY_ENC_ALG});
   res.json(keystore.toJSON());
 });
 
 // This route returns the RS256 public key, used as the JWKS URL by auth0 to verify RS256 tokens
 app.get('/jwks', async (req, res) => {
+    const context = req.webtaskContext || process.env;
   // Create and return a JSON Web Key Set (JWKS) containing the RS256 public key
-  var publicKey = process.env.INTERMEDIARY_PUBLIC_KEY.replace(/\n/g, "\r\n");
+  var publicKey = context.INTERMEDIARY_PUBLIC_KEY.replace(/\n/g, "\r\n");
   var keystore = JWK.createKeyStore();
   await keystore.add(publicKey, "pem");
   res.json(keystore.toJSON());
@@ -171,35 +175,35 @@ app.listen(port, () => {
 });
 
 // Function to load the private key for client_assertion
-async function loadPrivateKeyForClientAssertion() {
+async function loadPrivateKeyForClientAssertion(context) {
   try {
-    var publicKey = process.env.RELYING_PARTY_PUBLIC_KEY.replace(/\n/g, "\r\n");
+    var publicKey = context.RELYING_PARTY_PUBLIC_KEY.replace(/\n/g, "\r\n");
     const key = await JWK.asKey(publicKey, "pem");
     var jsonData = key.toJSON();
-    jsonData.d = process.env.RELYING_PARTY_PRIVATE_KEY;
-    return await importJWK(jsonData, process.env.RELYING_PARTY_CLIENT_ASSERTION_SIGNING_ALG);
+    jsonData.d = context.RELYING_PARTY_PRIVATE_KEY;
+    return await importJWK(jsonData, context.RELYING_PARTY_CLIENT_ASSERTION_SIGNING_ALG);
   } catch (e) {
     return e;
   }
 }
 // Function to load the private key for DECRYPTION
-async function loadPrivateKeyForJWE() {
+async function loadPrivateKeyForJWE(context) {
     try {
-      var publicKey = process.env.RELYING_PARTY_PUBLIC_KEY_ENC.replace(/\n/g, "\r\n");
+      var publicKey = context.RELYING_PARTY_PUBLIC_KEY_ENC.replace(/\n/g, "\r\n");
       const key = await JWK.asKey(publicKey, "pem");
       var jsonData = key.toJSON();
-      jsonData.d = process.env.RELYING_PARTY_PRIVATE_KEY_ENC;
-      return await importJWK(jsonData, process.env.RELYING_PARTY_PRIVATE_KEY_ENC_ALG);
+      jsonData.d = context.RELYING_PARTY_PRIVATE_KEY_ENC;
+      return await importJWK(jsonData, context.RELYING_PARTY_PRIVATE_KEY_ENC_ALG);
     } catch (e) {
       return e;
     }
   }
 
 // Function to load the RS256 private key
-async function loadRS256PrivateKey() {
+async function loadRS256PrivateKey(context) {
   try {
-    var privateKey = process.env.INTERMEDIARY_PRIVATE_KEY.replace(/\n/g, "\r\n");
-    var key = await importPKCS8(privateKey, process.env.INTERMEDIARY_SIGNING_ALG);
+    var privateKey = context.INTERMEDIARY_PRIVATE_KEY.replace(/\n/g, "\r\n");
+    var key = await importPKCS8(privateKey, context.INTERMEDIARY_SIGNING_ALG);
     return key;
   } catch (e) {
     console.log(e);
@@ -208,14 +212,14 @@ async function loadRS256PrivateKey() {
 }
 
 // Function to load the public key of IDP
-async function loadPublicKeyIDP() {
+async function loadPublicKeyIDP(context) {
   try {
     const client = jwksClient({
-      jwksUri: `https://${process.env.IDP_DOMAIN}/jwks`,
+      jwksUri: `https://${context.IDP_DOMAIN}/jwks`,
       requestHeaders: {}, // Optional
       timeout: 30000 // Defaults to 30s
     });
-    const kid = process.env.IDP_SIGNING_KEY_KID;
+    const kid = context.IDP_SIGNING_KEY_KID;
     const key = await client.getSigningKey(kid);
     console.log(key.asKey);
     const signingKey = key.publicKey || key.rsaPublicKey;
@@ -226,16 +230,16 @@ async function loadPublicKeyIDP() {
 }
 
 // Function to generate a client_assertion (JWT) for client authentication
-async function generatePrivateKeyJWTForClientAssertion() {
+async function generatePrivateKeyJWTForClientAssertion(context) {
   try {
-    const key = await loadPrivateKeyForClientAssertion();
+    const key = await loadPrivateKeyForClientAssertion(context);
     console.log(key);
     const jwt = await new SignJWT({})
-      .setProtectedHeader({ alg: process.env.IDP_SIGNING_ALG, kid: process.env.RELYING_PARTY_KID, typ: "JWT" })
+      .setProtectedHeader({ alg: context.IDP_SIGNING_ALG, kid: context.RELYING_PARTY_KID, typ: "JWT" })
       .setIssuedAt()
-      .setIssuer(process.env.IDP_CLIENT_ID)
-      .setSubject(process.env.IDP_CLIENT_ID)
-      .setAudience([`https://${process.env.IDP_DOMAIN}/`, `https://${process.env.IDP_DOMAIN}/token`])
+      .setIssuer(context.IDP_CLIENT_ID)
+      .setSubject(context.IDP_CLIENT_ID)
+      .setAudience([`https://${context.IDP_DOMAIN}/`, `https://${context.IDP_DOMAIN}/token`])
       .setExpirationTime('2m') // Expiration time
       .setJti(uuid.v4())
       .sign(key);
@@ -248,16 +252,16 @@ async function generatePrivateKeyJWTForClientAssertion() {
 }
 
 // Function to generate an RS256 token by the intermediary
-async function generateRS256Token(payload) {
+async function generateRS256Token(payload,context) {
   if (payload.nonce) delete payload.nonce;
   try {
-    const key = await loadRS256PrivateKey();
+    const key = await loadRS256PrivateKey(context);
     console.log(key);
     const jwt = await new SignJWT(payload)
-      .setProtectedHeader({ alg: process.env.INTERMEDIARY_SIGNING_ALG, kid: process.env.INTERMEDIARY_KEY_KID, typ: "JWT" })
+      .setProtectedHeader({ alg: context.INTERMEDIARY_SIGNING_ALG, kid: context.INTERMEDIARY_KEY_KID, typ: "JWT" })
       .setIssuedAt()
-      .setIssuer(`https://${process.env.IDP_DOMAIN}`)
-      .setAudience(process.env.IDP_CLIENT_ID)
+      .setIssuer(`https://${context.IDP_DOMAIN}`)
+      .setAudience(context.IDP_CLIENT_ID)
       .setExpirationTime('2m') // Expiration time
       .setJti(uuid.v4())
       .sign(key);
@@ -270,37 +274,32 @@ async function generateRS256Token(payload) {
 }
 
 
-async function decryptJWE(jwe) {
-    //var privateKeyEnc= "-----BEGIN EC PRIVATE KEY-----\nMHcCAQEEICc21VTwbHZrTUcgCoswXes+aS8t7GWqQH8CcAzVpkGzoAoGCCqGSM49\nAwEHoUQDQgAEVexWR3Lb2dmnzuZeSNzS58XtM6bFpJOr2QN+p/WKN4/vHtXLBzLy\npmoTdIho/4rsUCCsIQIon/GjGv7NzpaLhg==\n-----END EC PRIVATE KEY-----\n"
-    //privateKeyEnc = privateKeyEnc.replace(/\n/g,"\r\n");
-    //const privateKeyEnc = await loadPrivateKeyForJWE();
+async function decryptJWE(jwe, context) {
 
-    var publicKey = process.env.RELYING_PARTY_PUBLIC_KEY_ENC.replace(/\n/g, "\r\n");
+    var publicKey = context.RELYING_PARTY_PUBLIC_KEY_ENC.replace(/\n/g, "\r\n");
     const key = await JWK.asKey(publicKey, "pem");
     var jsonData = key.toJSON();
-    jsonData.d = process.env.RELYING_PARTY_PRIVATE_KEY_ENC;
+    jsonData.d = context.RELYING_PARTY_PRIVATE_KEY_ENC;
 
 
     try {
     var keystore = JWK.createKeyStore();
-     //var key2 = await JWK.asKey(privateKey,"pem");     
-     await keystore.add(jsonData, "json" , {"use" : "enc","alg": "ECDH-ES+A128KW"}); 
+     await keystore.add(jsonData, "json" , {"use" : "enc","alg": context.RELYING_PARTY_PRIVATE_KEY_ENC_ALG}); 
      
-    //await keystore.add(privateKeyEnc, "pem" , {"use" : "enc","alg": "ECDH-ES+A128KW"});
     console.log(keystore.toJSON(true));
-    const issuer = await Issuer.discover(`https://login.pushp.me`);
+    const issuer = await Issuer.discover(`https://${context.IDP_DOMAIN}`);
     const client = new issuer.Client({
-        client_id: "client_pkce_pk_jwt_ES256",
+        client_id: context.IDP_CLIENT_ID,
         token_endpoint_auth_method: 'private_key_jwt',
         redirect_uris: ["https://jwt.io"],
         id_token_signed_response_alg : 'ES256',
-        id_token_encrypted_response_alg : 'ECDH-ES+A128KW',
-        id_token_encrypted_response_enc :'A128CBC-HS256'
+        id_token_encrypted_response_alg : context.RELYING_PARTY_PRIVATE_KEY_ENC_ALG,
+        id_token_encrypted_response_enc :context.RELYING_PARTY_PRIVATE_KEY_ENC_ENC
 
     }, keystore.toJSON(true));
 
     //idToken, expectedAlg, expectedEnc
-    const idToken = await client.decryptJWE(jwe,'ECDH-ES+A128KW','A128CBC-HS256');
+    const idToken = await client.decryptJWE(jwe,context.RELYING_PARTY_PRIVATE_KEY_ENC_ALG,context.RELYING_PARTY_PRIVATE_KEY_ENC_ENC);
     console.log(idToken);
     return idToken;
     }
