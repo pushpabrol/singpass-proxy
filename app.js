@@ -1,10 +1,9 @@
 // Import required Node.js modules and libraries
 const express = require('express');
 const { JWK } = require('node-jose');
-const { SignJWT, importJWK, importPKCS8 } = require('jose'); // JSON Object Signing and Encryption (JOSE) library
+const { SignJWT, importJWK, importPKCS8,jwtVerify } = require('jose'); // JSON Object Signing and Encryption (JOSE) library
 const { Issuer, generators } = require('openid-client');
 const axios = require('axios'); // HTTP client for making requests
-const jwt = require('jsonwebtoken'); // JSON Web Token (JWT) library
 const uuid = require('uuid'); // Universally Unique Identifier (UUID) generator
 const dotenv = require('dotenv'); // Load environment variables from a .env file
 const qs = require('querystring'); // Query string parsing and formatting
@@ -109,12 +108,13 @@ app.post('/token', async (req, res) => {
       console.log(`nonce expected: ${nonce}`);
 
       // Verify the id_token with the public key
-      const payload = await jwt.verify(decryted_id_token, publicKeyIDP, {
+      const { payload, protectedHeader } = await jwtVerify(decryted_id_token, publicKeyIDP, {
         issuer: `https://${context.IDP_DOMAIN}`,
         audience: context.IDP_CLIENT_ID,
       });
-      console.log(payload);
 
+      console.log(payload);
+      console.log(protectedHeader);
       // Check if the nonce in the payload matches the expected nonce
       if (payload.nonce !== nonce) {
         return res.status(400).send('Nonce mismatch');
