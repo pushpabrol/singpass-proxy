@@ -1,7 +1,7 @@
 // Import required Node.js modules and libraries
 const express = require('express');
 const { JWK } = require('node-jose');
-const { SignJWT, importJWK, importPKCS8,jwtVerify } = require('jose'); // JSON Object Signing and Encryption (JOSE) library
+const { SignJWT, importJWK, importPKCS8,jwtVerify,createRemoteJWKSet } = require('jose'); // JSON Object Signing and Encryption (JOSE) library
 const { Issuer, generators } = require('openid-client');
 const axios = require('axios'); // HTTP client for making requests
 const uuid = require('uuid'); // Universally Unique Identifier (UUID) generator
@@ -103,8 +103,8 @@ app.post('/token', async (req, res) => {
       const decryted_id_token = await decryptJWE(id_token, context);
 
       // Load the public key of the IDP for verification
-      const publicKeyIDP = await loadPublicKeyIDP(context);
-
+      //const publicKeyIDP = await loadPublicKeyIDP(context);
+       const publicKeyIDP = jose.createRemoteJWKSet(new URL(`https://${context.IDP_DOMAIN}/jwks`))
       console.log(`nonce expected: ${nonce}`);
 
       // Verify the id_token with the public key
