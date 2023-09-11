@@ -273,13 +273,19 @@ async function generateRS256Token(payload) {
 async function decryptJWE(jwe) {
     //var privateKeyEnc= "-----BEGIN EC PRIVATE KEY-----\nMHcCAQEEICc21VTwbHZrTUcgCoswXes+aS8t7GWqQH8CcAzVpkGzoAoGCCqGSM49\nAwEHoUQDQgAEVexWR3Lb2dmnzuZeSNzS58XtM6bFpJOr2QN+p/WKN4/vHtXLBzLy\npmoTdIho/4rsUCCsIQIon/GjGv7NzpaLhg==\n-----END EC PRIVATE KEY-----\n"
     //privateKeyEnc = privateKeyEnc.replace(/\n/g,"\r\n");
-    const privateKeyEnc = await loadPrivateKeyForJWE();
+    //const privateKeyEnc = await loadPrivateKeyForJWE();
+
+    var publicKey = process.env.RELYING_PARTY_PUBLIC_KEY_ENC.replace(/\n/g, "\r\n");
+    const key = await JWK.asKey(publicKey, "pem");
+    var jsonData = key.toJSON();
+    jsonData.d = process.env.RELYING_PARTY_PRIVATE_KEY_ENC;
+
 
     try {
     var keystore = JWK.createKeyStore();
      //var key2 = await JWK.asKey(privateKey,"pem");     
-     //await keystore.add(privateKeyEnc.toJSON(true), "json" , {"use" : "enc","alg": "ECDH-ES+A128KW"}); 
-     await keystore.add(privateKeyEnc);
+     await keystore.add(jsonData, "json" , {"use" : "enc","alg": "ECDH-ES+A128KW"}); 
+     
     //await keystore.add(privateKeyEnc, "pem" , {"use" : "enc","alg": "ECDH-ES+A128KW"});
     console.log(keystore.toJSON(true));
     const issuer = await Issuer.discover(`https://login.pushp.me`);
