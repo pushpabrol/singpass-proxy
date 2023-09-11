@@ -273,11 +273,9 @@ async function generateRS256Token(payload) {
 async function decryptJWE(jwe) {
     var privateKeyEnc= "-----BEGIN EC PRIVATE KEY-----\nMHcCAQEEICc21VTwbHZrTUcgCoswXes+aS8t7GWqQH8CcAzVpkGzoAoGCCqGSM49\nAwEHoUQDQgAEVexWR3Lb2dmnzuZeSNzS58XtM6bFpJOr2QN+p/WKN4/vHtXLBzLy\npmoTdIho/4rsUCCsIQIon/GjGv7NzpaLhg==\n-----END EC PRIVATE KEY-----\n"
 
-    privateKey = privateKey.replace(/\n/g,"\r\n");
     privateKeyEnc = privateKeyEnc.replace(/\n/g,"\r\n");
     var keystore = JWK.createKeyStore();
      //var key2 = await JWK.asKey(privateKey,"pem");     
-    await keystore.add(privateKey, "pem" , {"use" : "sig"});
     await keystore.add(privateKeyEnc, "pem" , {"use" : "enc","alg": "ECDH-ES+A128KW"});
     console.log(keystore.toJSON(true));
     const issuer = await Issuer.discover(`https://login.pushp.me`);
