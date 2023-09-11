@@ -104,7 +104,7 @@ app.post('/token', async (req, res) => {
 
       // Load the public key of the IDP for verification
       //const publicKeyIDP = await loadPublicKeyIDP(context);
-       const publicKeyIDP = jose.createRemoteJWKSet(new URL(`https://${context.IDP_DOMAIN}/jwks`))
+       const publicKeyIDP = createRemoteJWKSet(new URL(`https://${context.IDP_DOMAIN}/jwks`))
       console.log(`nonce expected: ${nonce}`);
 
       // Verify the id_token with the public key
