@@ -150,7 +150,7 @@ app.get('/.well-known/keys', async (req, res) => {
   var publicKeyEnc = process.env.RELYING_PARTY_PUBLIC_KEY_ENC.replace(/\n/g, "\r\n");
   var keystore = JWK.createKeyStore();
   await keystore.add(publicKey, "pem", {"use" : "sig"});
-  await keystore.add(publicKeyEnc, "pem");
+  await keystore.add(publicKeyEnc, "pem", {"use" : "enc","alg": "ECDH-ES+A128KW"});
   res.json(keystore.toJSON());
 });
 
