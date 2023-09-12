@@ -151,24 +151,12 @@ app.post('/token', async (req, res) => {
 // Create a route for /.well-known/keys
 // Used by the relying party of IDP to provide an ES256 public key for client authentication
 app.get('/.well-known/keys', async (req, res) => {
-    const context = req.webtaskContext || process.env;
-  // Create and return a JSON Web Key Set (JWKS) containing the public key
-  var publicKey = context.RELYING_PARTY_PUBLIC_KEY.replace(/\n/g, "\r\n");
-  var publicKeyEnc = context.RELYING_PARTY_PUBLIC_KEY_ENC.replace(/\n/g, "\r\n");
-  var keystore = JWK.createKeyStore();
-  await keystore.add(publicKey, "pem", {"use" : "sig"});
-  await keystore.add(publicKeyEnc, "pem", {"use" : "enc","alg": context.RELYING_PARTY_PRIVATE_KEY_ENC_ALG});
   res.json(relyingPartyJWKS);
 });
 
 // This route returns the RS256 public key, used as the JWKS URL by auth0 to verify RS256 tokens
 app.get('/jwks', async (req, res) => {
-    const context = req.webtaskContext || process.env;
-  // Create and return a JSON Web Key Set (JWKS) containing the RS256 public key
-  var publicKey = context.INTERMEDIARY_PUBLIC_KEY.replace(/\n/g, "\r\n");
-  var keystore = JWK.createKeyStore();
-  await keystore.add(publicKey, "pem");
-  res.json(intermediaryJWKS);
+    res.json(intermediaryJWKS);
 });
 
 // Start the Express server and listen on the specified port
@@ -179,9 +167,8 @@ app.listen(port, () => {
 // Function to load the private key for client_assertion
 async function loadPrivateKeyForClientAssertion(context) {
   try {
-    var publicKey = context.RELYING_PARTY_PUBLIC_KEY.replace(/\n/g, "\r\n");
-    const key = await JWK.asKey(publicKey, "pem");
-    var jsonData = key.toJSON();
+
+    var jsonData = relyingPartyJWKS.keys.find( spki => spki.use === "sig");
     jsonData.d = context.RELYING_PARTY_PRIVATE_KEY;
     return await importJWK(jsonData, context.RELYING_PARTY_CLIENT_ASSERTION_SIGNING_ALG);
   } catch (e) {
@@ -250,15 +237,15 @@ async function generateRS256Token(payload,context) {
 
 async function decryptJWE(jwe, context) {
 
-    var publicKey = context.RELYING_PARTY_PUBLIC_KEY_ENC.replace(/\n/g, "\r\n");
-    const key = await JWK.asKey(publicKey, "pem");
-    var jsonData = key.toJSON();
+    //var publicKey = context.RELYING_PARTY_PUBLIC_KEY_ENC.replace(/\n/g, "\r\n");
+    //const key = await JWK.asKey(publicKey, "pem");
+    //var jsonData = key.toJSON();
+    var jsonData = relyingPartyJWKS.keys.find( spki => spki.use === "enc");
     jsonData.d = context.RELYING_PARTY_PRIVATE_KEY_ENC;
 
     try {
     var keystore = JWK.createKeyStore();
      await keystore.add(jsonData, "json" , {"use" : "enc","alg": context.RELYING_PARTY_PRIVATE_KEY_ENC_ALG}); 
-     
     console.log(keystore.toJSON(true));
     const issuer = await Issuer.discover(`https://${context.IDP_DOMAIN}`);
     const client = new issuer.Client({
