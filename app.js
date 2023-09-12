@@ -179,10 +179,8 @@ async function loadPrivateKeyForClientAssertion(context) {
 // Function to load the RS256 private key
 async function loadRS256PrivateKey(context) {
   try {
-    //var privateKey = context.INTERMEDIARY_PRIVATE_KEY.replace(/\n/g, "\r\n");
-    var jsonData = JSON.parse(context.INTERMEDIARY_PRIVATE_KEY_JSON);
-    console.log(jsonData);
-    var key = await importJWK(jsonData, context.INTERMEDIARY_SIGNING_ALG);
+    var privateKey = context.INTERMEDIARY_PRIVATE_KEY.replace(/\n/g, "\r\n");
+    var key = await importPKCS8(privateKey, context.INTERMEDIARY_SIGNING_ALG);
     return key;
   } catch (e) {
     console.log(e);
