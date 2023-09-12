@@ -180,7 +180,9 @@ async function loadPrivateKeyForClientAssertion(context) {
 async function loadRS256PrivateKey(context) {
   try {
     //var privateKey = context.INTERMEDIARY_PRIVATE_KEY.replace(/\n/g, "\r\n");
-    var key = await importJWK(JSON.parse(context.INTERMEDIARY_PRIVATE_KEY_JSON), context.INTERMEDIARY_SIGNING_ALG);
+    var jsonData = JSON.parse(context.INTERMEDIARY_PRIVATE_KEY_JSON);
+    console.log(jsonData);
+    var key = await importJWK(jsonData, context.INTERMEDIARY_SIGNING_ALG);
     return key;
   } catch (e) {
     console.log(e);
