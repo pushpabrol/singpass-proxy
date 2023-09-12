@@ -7,7 +7,6 @@ const axios = require('axios'); // HTTP client for making requests
 const uuid = require('uuid'); // Universally Unique Identifier (UUID) generator
 const dotenv = require('dotenv'); // Load environment variables from a .env file
 const qs = require('querystring'); // Query string parsing and formatting
-const jwksClient = require('jwks-rsa'); // JSON Web Key Set (JWKS) client for retrieving public keys
 
 const relyingPartyJWKS = require('./spkis/relyingPartyJWKS.json');
 const intermediaryJWKS = require('./spkis/intermediaryJWKS.json');
@@ -239,7 +238,6 @@ async function decryptJWE(jwe, context) {
 
     var jsonData = relyingPartyJWKS.keys.find( spki => spki.use === "enc");
     jsonData.d = context.RELYING_PARTY_PRIVATE_KEY_ENC;
-
     try {
     var keystore = JWK.createKeyStore();
      await keystore.add(jsonData, "json" , {"use" : "enc","alg": context.RELYING_PARTY_PRIVATE_KEY_ENC_ALG}); 
