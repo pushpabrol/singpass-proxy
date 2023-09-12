@@ -9,6 +9,10 @@ const dotenv = require('dotenv'); // Load environment variables from a .env file
 const qs = require('querystring'); // Query string parsing and formatting
 const jwksClient = require('jwks-rsa'); // JSON Web Key Set (JWKS) client for retrieving public keys
 
+const relyingPartyJWKS = require('./spkis/relyingPartyJWKS.json');
+const intermediaryJWKS = require('./spkis/intermediaryJWKS.json');
+
+
 dotenv.config(); // Load environment variables from the .env file
 
 const app = express(); // Create an Express application
@@ -102,9 +106,7 @@ app.post('/token', async (req, res) => {
 
       const decryted_id_token = await decryptJWE(id_token, context);
 
-      // Load the public key of the IDP for verification
-      //const publicKeyIDP = await loadPublicKeyIDP(context);
-       const publicKeyIDP = createRemoteJWKSet(new URL(`https://${context.IDP_DOMAIN}/jwks`))
+      const publicKeyIDP = createRemoteJWKSet(new URL(`https://${context.IDP_DOMAIN}/jwks`))
       console.log(`nonce expected: ${nonce}`);
 
       // Verify the id_token with the public key
@@ -156,7 +158,7 @@ app.get('/.well-known/keys', async (req, res) => {
   var keystore = JWK.createKeyStore();
   await keystore.add(publicKey, "pem", {"use" : "sig"});
   await keystore.add(publicKeyEnc, "pem", {"use" : "enc","alg": context.RELYING_PARTY_PRIVATE_KEY_ENC_ALG});
-  res.json(keystore.toJSON());
+  res.json(relyingPartyJWKS);
 });
 
 // This route returns the RS256 public key, used as the JWKS URL by auth0 to verify RS256 tokens
@@ -166,7 +168,7 @@ app.get('/jwks', async (req, res) => {
   var publicKey = context.INTERMEDIARY_PUBLIC_KEY.replace(/\n/g, "\r\n");
   var keystore = JWK.createKeyStore();
   await keystore.add(publicKey, "pem");
-  res.json(keystore.toJSON());
+  res.json(intermediaryJWKS);
 });
 
 // Start the Express server and listen on the specified port
@@ -186,18 +188,6 @@ async function loadPrivateKeyForClientAssertion(context) {
     return e;
   }
 }
-// Function to load the private key for DECRYPTION
-async function loadPrivateKeyForJWE(context) {
-    try {
-      var publicKey = context.RELYING_PARTY_PUBLIC_KEY_ENC.replace(/\n/g, "\r\n");
-      const key = await JWK.asKey(publicKey, "pem");
-      var jsonData = key.toJSON();
-      jsonData.d = context.RELYING_PARTY_PRIVATE_KEY_ENC;
-      return await importJWK(jsonData, context.RELYING_PARTY_PRIVATE_KEY_ENC_ALG);
-    } catch (e) {
-      return e;
-    }
-  }
 
 // Function to load the RS256 private key
 async function loadRS256PrivateKey(context) {
@@ -211,23 +201,7 @@ async function loadRS256PrivateKey(context) {
   }
 }
 
-// Function to load the public key of IDP
-async function loadPublicKeyIDP(context) {
-  try {
-    const client = jwksClient({
-      jwksUri: `https://${context.IDP_DOMAIN}/jwks`,
-      requestHeaders: {}, // Optional
-      timeout: 30000 // Defaults to 30s
-    });
-    const kid = context.IDP_SIGNING_KEY_KID;
-    const key = await client.getSigningKey(kid);
-    console.log(key.asKey);
-    const signingKey = key.publicKey || key.rsaPublicKey;
-    return signingKey;
-  } catch (e) {
-    return e;
-  }
-}
+
 
 // Function to generate a client_assertion (JWT) for client authentication
 async function generatePrivateKeyJWTForClientAssertion(context) {
@@ -280,7 +254,6 @@ async function decryptJWE(jwe, context) {
     const key = await JWK.asKey(publicKey, "pem");
     var jsonData = key.toJSON();
     jsonData.d = context.RELYING_PARTY_PRIVATE_KEY_ENC;
-
 
     try {
     var keystore = JWK.createKeyStore();
