@@ -168,7 +168,7 @@ async function loadPrivateKeyForClientAssertion(context) {
   try {
 
     var jsonData = relyingPartyJWKS.keys.find( spki => spki.use === "sig");
-    jsonData.d = context.RELYING_PARTY_PRIVATE_KEY;
+    jsonData.d = context.RELYING_PARTY_PRIVATE_KEY_SIGNING;
     return await importJWK(jsonData, context.RELYING_PARTY_CLIENT_ASSERTION_SIGNING_ALG);
   } catch (e) {
     return e;
