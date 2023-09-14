@@ -34,7 +34,7 @@ app.get('/authorize', async (req, res) => {
   console.log("code_verifier:", code_verifier);
   var eventual_code_challenge = code_challenge || generators.codeChallenge(code_verifier);
 
-  const nonce = "12345";
+  //const nonce = "12345";
 
   // Discover the OpenID Connect issuer and create a client
   const auth0Issuer = await Issuer.discover(`https://${context.IDP_DOMAIN}`);
@@ -47,7 +47,7 @@ app.get('/authorize', async (req, res) => {
   // Generate the authorization URL with required parameters
   const url = client.authorizationUrl({
     scope: `openid`,
-    nonce: nonce,
+   // nonce: nonce,
     response_type: "code",
     code_challenge: eventual_code_challenge,
     code_challenge_method: 'S256',
@@ -117,11 +117,11 @@ app.post('/token', async (req, res) => {
       console.log(payload);
       console.log(protectedHeader);
       // Check if the nonce in the payload matches the expected nonce
-      if (payload.nonce !== nonce) {
-        return res.status(400).send('Nonce mismatch');
-      } else {
+      // if (payload.nonce !== nonce) {
+      //   return res.status(400).send('Nonce mismatch');
+      // } else {
         // Remove the nonce from the payload and replace the id_token with a new RS256 token
-        delete payload.nonce;
+        if(payload.nonce) delete payload.nonce;
         response.data.payload = payload;
         delete response.data.id_token;
 
@@ -131,7 +131,7 @@ app.post('/token', async (req, res) => {
 
         // Send the response with the updated id_token
         return res.status(200).send(response.data);
-      }
+      //}
     } catch (error) {
       if (error.response) {
         // Handle errors with HTTP responses
