@@ -1,11 +1,11 @@
 // Import required Node.js modules and libraries
 const express = require('express');
 const { JWK, JWE } = require('node-jose');
-const { SignJWT, importJWK, importPKCS8,jwtVerify,createRemoteJWKSet } = require('jose'); // JSON Object Signing and Encryption (JOSE) library
-const axios = require('axios'); // HTTP client for making requests
-const uuid = require('uuid'); // Universally Unique Identifier (UUID) generator
-const dotenv = require('dotenv'); // Load environment variables from a .env file
-const qs = require('querystring'); // Query string parsing and formatting
+const { SignJWT, importJWK, importPKCS8, jwtVerify, createRemoteJWKSet } = require('jose'); // JSON Object Signing and Encryption (JOSE) library
+const axios = require('axios');
+const uuid = require('uuid');
+const dotenv = require('dotenv');
+const qs = require('querystring');
 
 const relyingPartyJWKS = require('./spkis/relyingPartyJWKS.json');
 const intermediaryJWKS = require('./spkis/intermediaryJWKS.json');
@@ -23,13 +23,11 @@ app.use(express.urlencoded({ extended: true }));
 
 // Create a route for the /token endpoint
 app.post('/token', async (req, res) => {
-    const context = req.webtaskContext || process.env;
+  const context = req.webtaskContext || process.env;
   console.log(req.body);
 
   // Retrieve parameters from the request body
   const { client_id, code, code_verifier, redirect_uri } = req.body;
-  //const auth0Issuer = await Issuer.discover(`https://${context.IDP_DOMAIN}`);
-  const nonce = "12345";
 
   // Check if the client_id is missing
   if (!client_id) {
@@ -59,17 +57,17 @@ app.post('/token', async (req, res) => {
         }),
       };
 
-      // Send the token exchange request to the authorization server
+      // Send the token request to the authorization server
       const response = await axios.request(options);
       console.log(response.data);
 
       // Extract the id_token from the response
       const { id_token } = response.data;
 
+      // Extract the id_token from the response
       const decryted_id_token = await decryptJWE(id_token, context);
 
       const publicKeyIDP = createRemoteJWKSet(new URL(`https://${context.IDP_DOMAIN}/jwks`))
-      console.log(`nonce expected: ${nonce}`);
 
       // Verify the id_token with the public key
       const { payload, protectedHeader } = await jwtVerify(decryted_id_token, publicKeyIDP, {
@@ -79,22 +77,18 @@ app.post('/token', async (req, res) => {
 
       console.log(payload);
       console.log(protectedHeader);
-      // Check if the nonce in the payload matches the expected nonce
-      // if (payload.nonce !== nonce) {
-      //   return res.status(400).send('Nonce mismatch');
-      // } else {
-        // Remove the nonce from the payload and replace the id_token with a new RS256 token
-        if(payload.nonce) delete payload.nonce;
-        response.data.payload = payload;
-        delete response.data.id_token;
+      // Remove the nonce from the payload and replace the id_token with a new RS256 token
+      if (payload.nonce) delete payload.nonce;
+      response.data.payload = payload;
+      delete response.data.id_token;
 
-        // Generate an RS256 token from the payload for auth0
-        const jwt = await generateRS256Token(payload, context);
-        response.data.id_token = jwt;
+      // Generate an RS256 token from the payload for auth0
+      const jwt = await generateRS256Token(payload, context);
+      response.data.id_token = jwt;
 
-        // Send the response with the updated id_token
-        return res.status(200).send(response.data);
-      //}
+      // Send the response with the updated id_token
+      return res.status(200).send(response.data);
+
     } catch (error) {
       if (error.response) {
         // Handle errors with HTTP responses
@@ -118,7 +112,7 @@ app.get('/.well-known/keys', async (req, res) => {
 
 // This route returns the RS256 public key, used as the JWKS URL by auth0 to verify RS256 tokens
 app.get('/jwks', async (req, res) => {
-    res.json(intermediaryJWKS);
+  res.json(intermediaryJWKS);
 });
 
 // Start the Express server and listen on the specified port
@@ -130,7 +124,7 @@ app.listen(port, () => {
 async function loadPrivateKeyForClientAssertion(context) {
   try {
 
-    var jsonData = relyingPartyJWKS.keys.find( spki => spki.use === "sig");
+    var jsonData = relyingPartyJWKS.keys.find(spki => spki.use === "sig");
     jsonData.d = context.RELYING_PARTY_PRIVATE_KEY_SIGNING;
     return await importJWK(jsonData, context.RELYING_PARTY_CLIENT_ASSERTION_SIGNING_ALG);
   } catch (e) {
@@ -175,7 +169,7 @@ async function generatePrivateKeyJWTForClientAssertion(context) {
 }
 
 // Function to generate an RS256 token by the intermediary
-async function generateRS256Token(payload,context) {
+async function generateRS256Token(payload, context) {
   if (payload.nonce) delete payload.nonce;
   try {
     const key = await loadRS256PrivateKey(context);
@@ -198,21 +192,25 @@ async function generateRS256Token(payload,context) {
 
 async function decryptJWE(jwe, context) {
 
-    var jsonData = relyingPartyJWKS.keys.find( spki => spki.use === "enc");
+  var jsonData = relyingPartyJWKS.keys.find(spki => spki.use === "enc" && spki.alg === context.RELYING_PARTY_PRIVATE_KEY_ENC_ALG);
+  if (jsonData) {
     jsonData.d = context.RELYING_PARTY_PRIVATE_KEY_ENC;
     try {
-    var keystore = JWK.createKeyStore();
-     await keystore.add(jsonData, "json" , {"use" : "enc","alg": context.RELYING_PARTY_PRIVATE_KEY_ENC_ALG}); 
-    console.log(keystore.toJSON(true));
-    const decryptor =  JWE.createDecrypt(keystore)
-    const decryptedData = await decryptor.decrypt(jwe);
-    const idToken = decryptedData.plaintext.toString('utf8');
-    console.log(idToken);
-    return idToken;
-    }
-    catch(e){
-        console.log(e);
-        throw e;
+
+      const decryptor = JWE.createDecrypt(await JWK.asKey(jsonData, "json"));
+      const decryptedData = await decryptor.decrypt(jwe);
+      const idToken = decryptedData.plaintext.toString('utf8');
+      console.log(idToken);
+      return idToken;
     }
 
+    catch (e) {
+      console.log(e);
+      throw e;
+    }
+  } else {
+    console.log("Either not encrypted or the right key is not available!, returning token as is!")
+    return jwe;
   }
+
+}
