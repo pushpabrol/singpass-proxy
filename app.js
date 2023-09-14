@@ -1,6 +1,6 @@
 // Import required Node.js modules and libraries
 const express = require('express');
-const { JWK } = require('node-jose');
+const { JWK, JWE } = require('node-jose');
 const { SignJWT, importJWK, importPKCS8,jwtVerify,createRemoteJWKSet } = require('jose'); // JSON Object Signing and Encryption (JOSE) library
 const { Issuer, generators } = require('openid-client');
 const axios = require('axios'); // HTTP client for making requests
@@ -23,40 +23,6 @@ app.use(express.json());
 // Middleware to parse URL-encoded request bodies
 app.use(express.urlencoded({ extended: true }));
 
-// Create a route for the /authorize endpoint
-app.get('/authorize', async (req, res) => {
-    const context = req.webtaskContext || process.env;
-  // Extract query parameters from the request
-  const { state, code_challenge } = req.query;
-
-  // Generate a code_verifier and code_challenge
-  const code_verifier = generators.codeVerifier();
-  console.log("code_verifier:", code_verifier);
-  var eventual_code_challenge = code_challenge || generators.codeChallenge(code_verifier);
-
-  //const nonce = "12345";
-
-  // Discover the OpenID Connect issuer and create a client
-  const auth0Issuer = await Issuer.discover(`https://${context.IDP_DOMAIN}`);
-  const client = new auth0Issuer.Client({
-    client_id: context.IDP_CLIENT_ID,
-    token_endpoint_auth_method: 'private_key_jwt',
-    redirect_uris: [context.RP_REDIRECT_URI]
-  });
-
-  // Generate the authorization URL with required parameters
-  const url = client.authorizationUrl({
-    scope: `openid`,
-   // nonce: nonce,
-    response_type: "code",
-    code_challenge: eventual_code_challenge,
-    code_challenge_method: 'S256',
-    state: state
-  });
-
-  // Redirect the user to the authorization URL
-  res.redirect(url);
-});
 
 // Create a route for the /token endpoint
 app.post('/token', async (req, res) => {
@@ -242,19 +208,20 @@ async function decryptJWE(jwe, context) {
     var keystore = JWK.createKeyStore();
      await keystore.add(jsonData, "json" , {"use" : "enc","alg": context.RELYING_PARTY_PRIVATE_KEY_ENC_ALG}); 
     console.log(keystore.toJSON(true));
+    const idToken =  JWE.decrypt(jwe, keystore);
     const issuer = await Issuer.discover(`https://${context.IDP_DOMAIN}`);
-    const client = new issuer.Client({
-        client_id: context.IDP_CLIENT_ID,
-        token_endpoint_auth_method: 'private_key_jwt',
-        redirect_uris: ["https://jwt.io"],
-        id_token_signed_response_alg : 'ES256',
-        id_token_encrypted_response_alg : context.RELYING_PARTY_PRIVATE_KEY_ENC_ALG,
-        id_token_encrypted_response_enc :context.RELYING_PARTY_PRIVATE_KEY_ENC_ENC
+    // const client = new issuer.Client({
+    //     client_id: context.IDP_CLIENT_ID,
+    //     token_endpoint_auth_method: 'private_key_jwt',
+    //     redirect_uris: ["https://jwt.io"],
+    //     id_token_signed_response_alg : 'ES256',
+    //     id_token_encrypted_response_alg : context.RELYING_PARTY_PRIVATE_KEY_ENC_ALG,
+    //     id_token_encrypted_response_enc :context.RELYING_PARTY_PRIVATE_KEY_ENC_ENC
 
-    }, keystore.toJSON(true));
+    // }, keystore.toJSON(true));
 
     //idToken, expectedAlg, expectedEnc
-    const idToken = await client.decryptJWE(jwe,context.RELYING_PARTY_PRIVATE_KEY_ENC_ALG,context.RELYING_PARTY_PRIVATE_KEY_ENC_ENC);
+    //const idToken = await client.decryptJWE(jwe,context.RELYING_PARTY_PRIVATE_KEY_ENC_ALG,context.RELYING_PARTY_PRIVATE_KEY_ENC_ENC);
     console.log(idToken);
     return idToken;
     }
