@@ -2,7 +2,6 @@
 const express = require('express');
 const { JWK, JWE } = require('node-jose');
 const { SignJWT, importJWK, importPKCS8,jwtVerify,createRemoteJWKSet } = require('jose'); // JSON Object Signing and Encryption (JOSE) library
-const { Issuer, generators } = require('openid-client');
 const axios = require('axios'); // HTTP client for making requests
 const uuid = require('uuid'); // Universally Unique Identifier (UUID) generator
 const dotenv = require('dotenv'); // Load environment variables from a .env file
@@ -10,7 +9,6 @@ const qs = require('querystring'); // Query string parsing and formatting
 
 const relyingPartyJWKS = require('./spkis/relyingPartyJWKS.json');
 const intermediaryJWKS = require('./spkis/intermediaryJWKS.json');
-
 
 dotenv.config(); // Load environment variables from the .env file
 
@@ -23,7 +21,6 @@ app.use(express.json());
 // Middleware to parse URL-encoded request bodies
 app.use(express.urlencoded({ extended: true }));
 
-
 // Create a route for the /token endpoint
 app.post('/token', async (req, res) => {
     const context = req.webtaskContext || process.env;
@@ -31,7 +28,7 @@ app.post('/token', async (req, res) => {
 
   // Retrieve parameters from the request body
   const { client_id, code, code_verifier, redirect_uri } = req.body;
-  const auth0Issuer = await Issuer.discover(`https://${context.IDP_DOMAIN}`);
+  //const auth0Issuer = await Issuer.discover(`https://${context.IDP_DOMAIN}`);
   const nonce = "12345";
 
   // Check if the client_id is missing
@@ -49,7 +46,7 @@ app.post('/token', async (req, res) => {
       // Prepare the request to exchange the authorization code for tokens
       const options = {
         method: 'POST',
-        url: auth0Issuer.token_endpoint,
+        url: `https://${context.IDP_DOMAIN}/token`,
         headers: { 'content-type': 'application/x-www-form-urlencoded' },
         data: qs.stringify({
           grant_type: 'authorization_code',
@@ -199,7 +196,6 @@ async function generateRS256Token(payload,context) {
   }
 }
 
-
 async function decryptJWE(jwe, context) {
 
     var jsonData = relyingPartyJWKS.keys.find( spki => spki.use === "enc");
@@ -208,20 +204,9 @@ async function decryptJWE(jwe, context) {
     var keystore = JWK.createKeyStore();
      await keystore.add(jsonData, "json" , {"use" : "enc","alg": context.RELYING_PARTY_PRIVATE_KEY_ENC_ALG}); 
     console.log(keystore.toJSON(true));
-    const idToken =  JWE.decrypt(jwe, keystore);
-    const issuer = await Issuer.discover(`https://${context.IDP_DOMAIN}`);
-    // const client = new issuer.Client({
-    //     client_id: context.IDP_CLIENT_ID,
-    //     token_endpoint_auth_method: 'private_key_jwt',
-    //     redirect_uris: ["https://jwt.io"],
-    //     id_token_signed_response_alg : 'ES256',
-    //     id_token_encrypted_response_alg : context.RELYING_PARTY_PRIVATE_KEY_ENC_ALG,
-    //     id_token_encrypted_response_enc :context.RELYING_PARTY_PRIVATE_KEY_ENC_ENC
-
-    // }, keystore.toJSON(true));
-
-    //idToken, expectedAlg, expectedEnc
-    //const idToken = await client.decryptJWE(jwe,context.RELYING_PARTY_PRIVATE_KEY_ENC_ALG,context.RELYING_PARTY_PRIVATE_KEY_ENC_ENC);
+    const decryptor =  JWE.createDecrypt(keystore)
+    const decryptedData = await decryptor.decrypt(jwe);
+    const idToken = decryptedData.plaintext.toString('utf8');
     console.log(idToken);
     return idToken;
     }

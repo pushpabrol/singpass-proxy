@@ -15,7 +15,6 @@
     "express": "^4.18.2",
     "jose": "^4.14.6",
     "node-jose": "^2.2.0",
-    "openid-client": "^5.5.0",
     "querystring": "^0.2.1",
     "uuid": "^9.0.0"
   }
