@@ -120,7 +120,7 @@ app.listen(port, () => {
   console.log(`Server is listening at http://localhost:${port}`);
 });
 
-// Function to load the private key for client_assertion
+// Function to load the private key for client_assertion - ES256
 async function loadPrivateKeyForClientAssertion(context) {
   try {
 
@@ -152,7 +152,7 @@ async function generatePrivateKeyJWTForClientAssertion(context) {
     const key = await loadPrivateKeyForClientAssertion(context);
     console.log(key);
     const jwt = await new SignJWT({})
-      .setProtectedHeader({ alg: context.IDP_SIGNING_ALG, kid: context.RELYING_PARTY_KID, typ: "JWT" })
+      .setProtectedHeader({ alg: context.RELYING_PARTY_CLIENT_ASSERTION_SIGNING_ALG, kid: context.RELYING_PARTY_KID, typ: "JWT" })
       .setIssuedAt()
       .setIssuer(context.IDP_CLIENT_ID)
       .setSubject(context.IDP_CLIENT_ID)
