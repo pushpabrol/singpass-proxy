@@ -10,6 +10,9 @@ const qs = require('querystring');
 const relyingPartyJWKS = require('./spkis/relyingPartyJWKS.json');
 const intermediaryJWKS = require('./spkis/intermediaryJWKS.json');
 
+const decode = (input) => Buffer.from(input, 'base64');
+
+
 dotenv.config(); // Load environment variables from the .env file
 
 const app = express(); // Create an Express application
@@ -193,10 +196,11 @@ async function generateRS256Token(payload, context) {
 async function decryptJWE(jwe, context) {
 
   var jsonData = relyingPartyJWKS.keys.find(spki => spki.use === "enc" && spki.alg === context.RELYING_PARTY_PRIVATE_KEY_ENC_ALG);
+  
   if (jsonData) {
     jsonData.d = context.RELYING_PARTY_PRIVATE_KEY_ENC;
     try {
-
+      if(!checkTokenEncryptionAlgEnc(jwe,context)) throw new Error("Token from IDP - Encryption and/or encoding mismatch!");
       const decryptor = JWE.createDecrypt(await JWK.asKey(jsonData, "json"));
       const decryptedData = await decryptor.decrypt(jwe);
       const idToken = decryptedData.plaintext.toString('utf8');
@@ -212,5 +216,25 @@ async function decryptJWE(jwe, context) {
     console.log("Either not encrypted or the right key is not available!, returning token as is!")
     return jwe;
   }
+
+}
+
+
+function checkTokenEncryptionAlgEnc(jwe, context) {
+  const expectedAlg = context.RELYING_PARTY_PRIVATE_KEY_ENC_ALG;
+  const expectedEnc = context.RELYING_PARTY_PRIVATE_KEY_ENC_ENC;
+  const header = JSON.parse(decode(jwe.split('.')[0]));
+  var asExtpected = true;
+
+  if (header.alg !== expectedAlg) {
+    console.log(`unexpected JWE alg received, expected ${expectedAlg}, got: ${header.alg}`)
+    asExtpected = false;
+  }
+
+  if (header.enc !== expectedEnc) {
+    console.log(`unexpected JWE enc received, expected ${expectedEnc}, got: ${header.enc}`)
+    asExtpected = false;
+  }
+  return asExtpected;
 
 }
