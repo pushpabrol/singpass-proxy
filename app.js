@@ -70,7 +70,7 @@ app.post('/token', async (req, res) => {
       // Extract the id_token from the response
       const decryted_id_token = await decryptJWE(id_token, context);
 
-      const publicKeyIDP = createRemoteJWKSet(new URL(`https://${context.IDP_DOMAIN}/jwks`))
+      const publicKeyIDP = createRemoteJWKSet(new URL(`https://${context.IDP_DOMAIN}${context.IDP_JWKS_PATH}`))
 
       // Verify the id_token with the public key
       const { payload, protectedHeader } = await jwtVerify(decryted_id_token, publicKeyIDP, {
