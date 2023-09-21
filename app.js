@@ -81,7 +81,7 @@ app.post('/token', async (req, res) => {
       console.log(payload);
       console.log(protectedHeader);
       // Remove the nonce from the payload and replace the id_token with a new RS256 token
-      if (payload.nonce) delete payload.nonce;
+      if (context.REMOVE_NONCE === "Y" && payload.nonce) delete payload.nonce;
       response.data.payload = payload;
       delete response.data.id_token;
 
